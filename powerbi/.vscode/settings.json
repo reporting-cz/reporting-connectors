@@ -1,0 +1,5 @@
+{
+  "powerquery.sdk.defaultQueryFile": "${workspaceFolder}\\reporting.query.pq",
+  "powerquery.sdk.defaultExtension": "${workspaceFolder}\\bin\\AnyCPU\\Debug\\powerbi.mez",
+  "powerquery.general.mode": "SDK"
+}
