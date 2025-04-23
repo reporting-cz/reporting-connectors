@@ -2,7 +2,7 @@
 [Version = "1.0.0"]
 section Reporting;
 
-domain = "report.reporting.cz";
+defaultDomain = "report.reporting.cz";
 client_id = "28bcedda-5acd-4050-9312-1bd7bccde8c4"; // Text.FromBinary(Extension.Contents("client_id"));
 client_secret = "jbaft7gsv4n3nb7rkezki4c2rr5x2tic"; // Text.FromBinary(Extension.Contents("client_secret"));
 redirect_uri = "https://oauth.powerbi.com/views/oauthredirect.html";
@@ -10,10 +10,11 @@ windowWidth = 600;
 windowHeight = 600;
 
 [DataSource.Kind="Reporting", Publish="Reporting.Publish"]
-shared Reporting.Table = TableRequest; //(thread as text) => Value.ReplaceType(TableRequest, TableRequestType);
+shared Reporting.Content = ContentRequest; //(thread as text) => Value.ReplaceType(TableRequest, TableRequestType);
 
-TableRequest = (thread as text) =>
+ContentRequest = (thread as text, optional domain as text) =>
 	let
+		domain = domain ?? defaultDomain,
 		url = "https://" & domain & "/api/export/" & thread & "?" & Uri.BuildQueryString([
 			delimiter = "tab",
 			decimal_separator = ".",
@@ -60,7 +61,7 @@ Reporting = [
 Reporting.Publish = [
 	Category = "Other",
 	ButtonText = { Extension.LoadString("ButtonTitle"), Extension.LoadString("ButtonHelp") },
-	LearnMoreUrl = "https://report.reporting.cz//wiki/Power_BI",
+	LearnMoreUrl = "https://report.reporting.cz/wiki/Power_BI",
 	SourceImage = Reporting.Icons,
 	SourceTypeImage = Reporting.Icons
 ];
@@ -70,33 +71,42 @@ Reporting.Icons = [
 	Icon32 = { Extension.Contents("reporting32.png"), Extension.Contents("reporting40.png"), Extension.Contents("reporting48.png"), Extension.Contents("reporting64.png") }
 ];
 
+GetDomainFromResource = (resourceUrl) =>
+	let
+		json = Json.Document(resourceUrl),
+		domain = if Record.HasFields(json, "domain") then json[domain] else defaultDomain
+	in
+		domain;
 
 //
 // OAuth2 flow definition
 //
 StartLogin = (resourceUrl, state, display) =>
 	let
-		AuthorizeUrl = "https://" & domain & "/auth/oauth/authorizationcode?"
-			& Uri.BuildQueryString(
-				[
-					client_id = client_id,
-					redirect = redirect_uri,
-					prefer_sso = "1",
-					oauth2 = "1"
-				]
-			)
+		domain = GetDomainFromResource(resourceUrl),
+		AuthorizeUrl = "https://" & domain & "/auth/oauth/authorizationcode?" & Uri.BuildQueryString([
+			client_id = client_id,
+			redirect = redirect_uri,
+			prefer_sso = "1",
+			oauth2 = "1",
+			test = resourceUrl
+		])
 	in
 		[
 			LoginUri = AuthorizeUrl,
 			CallbackUri = redirect_uri,
 			WindowHeight = windowHeight,
 			WindowWidth = windowWidth,
-			Context = null
+			Context = domain
 		];
 
-FinishLogin = (context, callbackUri, state) => let Parts = Uri.Parts(callbackUri)[Query] in TokenMethod(Parts[authorization_code]);
+FinishLogin = (context, callbackUri, state) => 
+	let 
+		Parts = Uri.Parts(callbackUri)[Query] 
+	in
+		TokenMethod(Parts[authorization_code], context);
 
-TokenMethod = (code) =>
+TokenMethod = (code, domain) =>
 	let
 		Response = Web.Contents("https://" & domain & "/auth/oauth?", [
 			Content = Json.FromValue([
@@ -115,6 +125,7 @@ TokenMethod = (code) =>
 
 RefreshTokenMethod = (resourceUrl, refreshToken, state) =>
 	let
+		domain = GetDomainFromResource(resourceUrl),
 		Response = Web.Contents("https://" & domain & "/auth/oauth?", [
 			Content = Json.FromValue([
 				client_id = client_id,
