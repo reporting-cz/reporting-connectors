@@ -6,21 +6,32 @@ defaultDomain = "report.reporting.cz";
 client_id = "28bcedda-5acd-4050-9312-1bd7bccde8c4"; // Text.FromBinary(Extension.Contents("client_id"));
 client_secret = "jbaft7gsv4n3nb7rkezki4c2rr5x2tic"; // Text.FromBinary(Extension.Contents("client_secret"));
 redirect_uri = "https://oauth.powerbi.com/views/oauthredirect.html";
-windowWidth = 600;
-windowHeight = 600;
+windowWidth = 700;
+windowHeight = 700;
 
 [DataSource.Kind="Reporting", Publish="Reporting.Publish"]
 shared Reporting.Content = ContentRequest; //(thread as text) => Value.ReplaceType(TableRequest, TableRequestType);
 
-ContentRequest = (thread as text, optional domain as text) =>
+// converts parameters in json to query string
+// example: { "a": 1, "b": 2 } => "p[a]=1&p[b]=2"
+ParametersToQueryString = (parameters as text) =>
+	let
+		json = Json.Document(parameters),
+		keys = List.Transform(Record.FieldNames(json), each "p[" & _ & "]"),
+		params = Record.FromList(List.Transform(Record.FieldValues(json), each Text.From(_)), keys)
+	in
+		Uri.BuildQueryString(params);
+
+ContentRequest = (thread as text, optional parameters as text, optional domain as text) =>
 	let
 		domain = domain ?? defaultDomain,
+		parameters = if parameters = null or parameters = "" then "" else ("&" & ParametersToQueryString(parameters)),
 		url = "https://" & domain & "/api/export/" & thread & "?" & Uri.BuildQueryString([
 			delimiter = "tab",
 			decimal_separator = ".",
 			header = "1",
 			encoding = "UTF-8"
-		]),
+		]) & parameters,
 		tab1 = Table.Buffer(Csv.Document(Web.Contents(url, [
 			Headers = [#"Authorization" = "Bearer " & Extension.CurrentCredential()[access_token]]
 		]), [
@@ -46,7 +57,7 @@ ContentRequest = (thread as text, optional domain as text) =>
 
 // Data Source Kind description
 Reporting = [
-	TestConnection = (dataSourcePath) => {"Reporting.Table", "excel-export-test1"},
+	TestConnection = (dataSourcePath) => {"Reporting.Content", "excel-export-test1", "{""a"":1}"},
 	Authentication = [
 		OAuth = [
 			StartLogin = StartLogin,
@@ -57,7 +68,7 @@ Reporting = [
 	]
 ];
 
-// // Data Source UI publishing description
+// Data Source UI publishing description
 Reporting.Publish = [
 	Category = "Other",
 	ButtonText = { Extension.LoadString("ButtonTitle"), Extension.LoadString("ButtonHelp") },
@@ -78,9 +89,8 @@ GetDomainFromResource = (resourceUrl) =>
 	in
 		domain;
 
-//
+
 // OAuth2 flow definition
-//
 StartLogin = (resourceUrl, state, display) =>
 	let
 		domain = GetDomainFromResource(resourceUrl),
