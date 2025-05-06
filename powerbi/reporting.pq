@@ -23,11 +23,18 @@ ParametersToQueryString = (parameters as text) =>
 	in
 		Uri.BuildQueryString(params);
 
-ContentRequest = (domain as text, optional thread as text, optional parameters as text) =>
+GetDomain = (domain as text) =>
+	let
+		domain1 = if domain = null or domain = "" then defaultDomain else domain,
+		domain2 = Text.Split(domain, "/")
+	in 
+		domain2{0};
+
+ContentRequest = (domain as nullable text, optional thread as text, optional parameters as text) =>
 	let
 		thread = thread ?? defaultThread,
 		parameters = if parameters = null or parameters = "" then "" else ("&" & ParametersToQueryString(parameters)),
-		url = "https://" & domain & "/api/export/" & thread & "?" & Uri.BuildQueryString([
+		url = "https://" & GetDomain(domain) & "/api/export/" & thread & "?" & Uri.BuildQueryString([
 			delimiter = "tab",
 			decimal_separator = ".",
 			header = "1",
@@ -86,7 +93,7 @@ Reporting.Icons = [
 GetDomainFromResource = (resourceUrl) =>
 	let
 		json = Json.Document(resourceUrl),
-		domain = if Record.HasFields(json, "domain") then json[domain] else defaultDomain
+		domain = if Record.HasFields(json, "domain") then GetDomain(json[domain]) else defaultDomain
 	in
 		domain;
 
