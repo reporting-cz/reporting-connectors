@@ -65,7 +65,7 @@ ContentRequest = (domain as text, optional thread as text, optional parameters a
 
 // Data Source Kind description
 Reporting = [
-	TestConnection = (dataSourcePath) => {"Reporting.Content", "excel-export-test1", "{""a"":1}"},
+	TestConnection = (dataSourcePath) => {"Reporting.Content", defaultDomain, "excel-export-test1", "{""a"":1}"},
 	Authentication = [
 		OAuth = [
 			StartLogin = StartLogin,
