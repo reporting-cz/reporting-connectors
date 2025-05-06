@@ -30,7 +30,7 @@ GetDomain = (domain as text) =>
 	in 
 		domain2{0};
 
-ContentRequest = (domain as nullable text, optional thread as text, optional parameters as text) =>
+ContentRequest = (domain as text, optional thread as text, optional parameters as text) =>
 	let
 		thread = thread ?? defaultThread,
 		parameters = if parameters = null or parameters = "" then "" else ("&" & ParametersToQueryString(parameters)),
