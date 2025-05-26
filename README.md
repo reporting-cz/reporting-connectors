@@ -18,6 +18,14 @@ Start the authorization flow to obtain an access token:
 ./powershell/authorization.ps1
 ```
 
+Output
+```
+Access Token: ???
+Refresh Token: ???
+Expires In: 86400 seconds (at 05/27/2025 12:37:03)
+```
+
+
 ### Export Data
 Export data from Reporting.cz using the following command:
 
