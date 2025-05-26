@@ -33,7 +33,6 @@ try {
 	$request = $context.Request
 
 	$queryParams = [System.Web.HttpUtility]::ParseQueryString($request.Url.Query)
-	Write-Host "Received query parameters:"
 	foreach ($key in $queryParams.Keys) {
 		if ($key -eq "authorization_code") {
 			$authorizationCode = $queryParams[$key]
