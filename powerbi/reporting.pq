@@ -4,8 +4,8 @@ section Reporting;
 
 defaultDomain = "report.reporting.cz";
 defaultThread = "PowerBI/test";
-client_id = "28bcedda-5acd-4050-9312-1bd7bccde8c4"; // Text.FromBinary(Extension.Contents("client_id"));
-client_secret = "jbaft7gsv4n3nb7rkezki4c2rr5x2tic"; // Text.FromBinary(Extension.Contents("client_secret"));
+client_id = Text.FromBinary(Extension.Contents("client_id"));
+client_secret = Text.FromBinary(Extension.Contents("client_secret"));
 redirect_uri = "https://oauth.powerbi.com/views/oauthredirect.html";
 windowWidth = 700;
 windowHeight = 700;
