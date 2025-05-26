@@ -1,7 +1,7 @@
 param(
 	[string]$AccessToken,
-	[string]$Domain = "report.reporting.cz",
 	[string]$Thread = "PowerBI/D_STATEMENT",
+	[string]$Domain = "report.reporting.cz",
 	[int]$CsvHeader = 1,
 	[string]$CsvDelimiter = ";",
 	[string]$CsvQuote = ""
