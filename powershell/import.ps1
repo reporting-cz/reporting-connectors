@@ -15,4 +15,4 @@ $url = $(
 	"file=", $FileName
 ) -join ""
 
-$client.UploadFile($url, $LocalPath)
+$client.UploadFile($url, $LocalPath) | Out-Null;
