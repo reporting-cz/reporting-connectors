@@ -1,5 +1,6 @@
 param(
-	[string]$Domain = "report.reporting.cz"
+	[string]$Domain = "report.reporting.cz",
+	[int]$Accounting = $null
 )
 
 $Domain = "https://$Domain"
@@ -14,10 +15,12 @@ $redirectUrl = "http://localhost:$port";
 $authorizationUrl = @(
 	$Domain,
 	"/auth/oauth/authorizationcode?",
-	"redirect=", $redirectUrl,
-	"&prefer_sso=1",
-	"&oauth2=1"
+	"redirect=", $redirectUrl
 ) -join ""
+
+if ($null -ne $Accounting) {
+	$authorizationUrl += "&a=$Accounting"
+}
 
 Start-Process $authorizationUrl
 
