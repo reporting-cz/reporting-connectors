@@ -1,6 +1,7 @@
 param(
 	[string]$Domain = "report.reporting.cz",
-	[int]$Accounting = $null
+	[int]$Accounting = $null,
+	[string]$Scope = "import export"
 )
 
 $Domain = "https://$Domain"
@@ -15,7 +16,8 @@ $redirectUrl = "http://localhost:$port";
 $authorizationUrl = @(
 	$Domain,
 	"/auth/oauth/authorize?",
-	"redirect=", $redirectUrl
+	"redirect=", $redirectUrl,
+	"&scope=", $Scope
 ) -join ""
 
 if ($null -ne $Accounting) {
