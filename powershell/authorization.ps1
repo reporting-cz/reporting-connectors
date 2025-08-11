@@ -14,7 +14,7 @@ $tcpListener.Stop()
 $redirectUrl = "http://localhost:$port";
 $authorizationUrl = @(
 	$Domain,
-	"/auth/oauth/authorizationcode?",
+	"/auth/oauth/authorize?",
 	"redirect=", $redirectUrl
 ) -join ""
 
