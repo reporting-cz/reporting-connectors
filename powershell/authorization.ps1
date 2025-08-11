@@ -4,6 +4,8 @@ param(
 	[string]$Scope = "import export"
 )
 
+Add-Type -AssemblyName System.Web
+
 $Domain = "https://$Domain"
 
 # Authorization Code Flow
