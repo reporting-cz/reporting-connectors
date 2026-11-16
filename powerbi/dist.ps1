@@ -1,1 +1,0 @@
-Copy-Item ./bin/AnyCPU/Debug/powerbi.mez ./dist/reporting-powerbi.mez

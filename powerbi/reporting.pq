@@ -10,6 +10,14 @@ redirect_uri = "https://oauth.powerbi.com/views/oauthredirect.html";
 windowWidth = 700;
 windowHeight = 700;
 
+// DEBUG: overrides the access token lifetime (seconds) to test the refresh flow.
+// Set to null for production (uses expires_in from the server).
+debugTokenLifetime = null;
+
+ApplyTokenLifetime = (token as record) as record =>
+	if debugTokenLifetime = null then token
+	else Record.AddField(Record.RemoveFields(token, "expires_in", MissingField.Ignore), "expires_in", debugTokenLifetime);
+
 [DataSource.Kind="Reporting", Publish="Reporting.Publish"]
 shared Reporting.Content = ContentRequest; //(thread as text) => Value.ReplaceType(TableRequest, TableRequestType);
 
@@ -26,7 +34,7 @@ ParametersToQueryString = (parameters as text) =>
 GetDomain = (domain as text) =>
 	let
 		domain1 = if domain = null or domain = "" then defaultDomain else domain,
-		domain2 = Text.Split(domain, "/")
+		domain2 = Text.Split(domain1, "/")
 	in 
 		domain2{0};
 
@@ -40,9 +48,9 @@ ContentRequest = (domain as text, optional thread as text, optional parameters a
 			header = "1",
 			encoding = "UTF-8"
 		]) & parameters,
-		tab1 = Table.Buffer(Csv.Document(Web.Contents(url, [
-			Headers = [#"Authorization" = "Bearer " & Extension.CurrentCredential()[access_token]]
-		]), [
+		// Authorization header is added automatically by the M engine (OAuth credential),
+		// which also handles token expiration and calls RefreshTokenMethod when needed.
+		tab1 = Table.Buffer(Csv.Document(Web.Contents(url), [
 			Delimiter = "#(tab)",
 			Encoding = 65001, 
 			QuoteStyle = QuoteStyle.None
@@ -51,21 +59,9 @@ ContentRequest = (domain as text, optional thread as text, optional parameters a
 	in
 		tab2;
 
-// TableRequestType = type function (
-// 	thread as (
-// 		type text meta [
-// 			Documentation.FieldCaption = "Thread",
-// 			Documentation.FieldDescription = "ETL thread name"
-// 		]
-// 	)
-// ) as table meta [
-// 	Documentation.Name = "ETL thread result",
-// 	Documentation.LongDescription = "ETL thread result"
-// ];
-
 // Data Source Kind description
 Reporting = [
-	TestConnection = (dataSourcePath) => {"Reporting.Content", defaultDomain, "test", "{}"},
+	TestConnection = (dataSourcePath) => {"Reporting.Content", defaultDomain, defaultThread, "{}"},
 	Authentication = [
 		OAuth = [
 			StartLogin = StartLogin,
@@ -90,12 +86,19 @@ Reporting.Icons = [
 	Icon32 = { Extension.Contents("reporting32.png"), Extension.Contents("reporting40.png"), Extension.Contents("reporting48.png"), Extension.Contents("reporting64.png") }
 ];
 
+// resourceUrl is the data source path, e.g. {"domain":"report.reporting.cz"};
+// it can also be null or a plain text (e.g. during token refresh)
 GetDomainFromResource = (resourceUrl) =>
 	let
-		json = Json.Document(resourceUrl),
-		domain = if Record.HasFields(json, "domain") then GetDomain(json[domain]) else defaultDomain
+		parsed = try Json.Document(resourceUrl) otherwise null,
+		domain =
+			if parsed is record and Record.HasFields(parsed, "domain") and parsed[domain] is text then GetDomain(parsed[domain])
+			else if parsed is text and parsed <> "" then GetDomain(parsed)
+			else if resourceUrl is text and resourceUrl <> "" and parsed = null then GetDomain(resourceUrl)
+			else defaultDomain,
+		resourceText =if resourceUrl = null then "null" else (try Text.From(resourceUrl) otherwise null) ?? "?"
 	in
-		domain;
+		Diagnostics.Trace(TraceLevel.Information, "Reporting: resourceUrl=" & resourceText & ", domain=" & domain, domain);
 
 
 // OAuth2 flow definition
@@ -138,13 +141,18 @@ TokenMethod = (code, domain) =>
 		]),
 		Parts = Json.Document(Response)
 	in
-		Parts;
+		ApplyTokenLifetime(Parts);
 
 
-RefreshTokenMethod = (resourceUrl, refreshToken, state) =>
+// NOTE: must have exactly 2 parameters. With 3 parameters the engine uses
+// a different signature (clientApplication, dataSourcePath, oldCredential).
+RefreshTokenMethod = (resourceUrl, refreshToken) =>
 	let
 		domain = GetDomainFromResource(resourceUrl),
-		Response = Web.Contents("https://" & domain & "/auth/oauth?", [
+		// Binary.Buffer: the response must be read exactly once. Web.Contents is lazy and every
+		// access would send a new POST - the server rotates refresh tokens, so a second request
+		// with the same (already used) refresh token fails with "invalid refresh token".
+		Response = Binary.Buffer(Web.Contents("https://" & domain & "/auth/oauth?", [
 			Content = Json.FromValue([
 				client_id = client_id,
 				client_secret = client_secret,
@@ -152,8 +160,18 @@ RefreshTokenMethod = (resourceUrl, refreshToken, state) =>
 				refresh_token = refreshToken,
 				redirect_uri = redirect_uri
 			]),
-			Headers = [#"Content-type" = "application/json", #"Accept" = "application/json"]
-		]),
-		Parts = Json.Document(Response)
+			Headers = [#"Content-type" = "application/json", #"Accept" = "application/json"],
+			ManualStatusHandling = {400, 401, 403, 404, 500}
+		])),
+		Parts = try Json.Document(Response) otherwise null,
+		_ = if Parts is record and Record.HasFields(Parts, "access_token") then null
+			else error Error.Record(
+				"Reporting.RefreshFailed",
+				"Token refresh failed (" & domain & "): " & Text.FromBinary(Response)
+			),
+		// keep the original refresh token if the server doesn't issue a new one
+		Result = if _ = null and Record.HasFields(Parts, "refresh_token") and Parts[refresh_token] <> null
+			then Parts
+			else Record.AddField(Record.RemoveFields(Parts, "refresh_token", MissingField.Ignore), "refresh_token", refreshToken)
 	in
-		Parts;
+		Diagnostics.Trace(TraceLevel.Information, "Reporting: access token refreshed", ApplyTokenLifetime(Result));

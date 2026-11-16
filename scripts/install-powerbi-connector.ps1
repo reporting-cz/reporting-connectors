@@ -1,5 +1,5 @@
 $documentDir = [Environment]::GetFolderPath('MyDocuments')
-$pbiDir = "$documentDir\Microsoft Power BI Desktop\Custom Connectors"
+$pbiDir = "$documentDir\Power BI Desktop\Custom Connectors"
 
 try {
 	if (!(Test-Path -Path $pbiDir)) {
